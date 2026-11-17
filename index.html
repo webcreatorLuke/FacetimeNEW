@@ -138,7 +138,10 @@ function boot(){
   if (!me){ me = rnd(); store.set('ft_num', me); }
   render();
   peer = new Peer(PFX + me);
-  peer.on('open', () => { $('#dot').classList.add('on'); $('#st').textContent = 'Online'; });
+  peer.on('open', () => {
+    $('#dot').classList.add('on'); $('#st').textContent = 'Online';
+    if ('Notification' in window && Notification.permission === 'default') toast('Tap anywhere once to turn on ringing and notifications.');
+  });
   peer.on('disconnected', () => { $('#dot').classList.remove('on'); $('#st').textContent = 'Reconnecting…'; try { peer.reconnect(); } catch(e){} });
   peer.on('error', e => {
     if (e.type === 'unavailable-id'){ me = rnd(); store.set('ft_num', me); peer.destroy(); boot(); return; }
@@ -154,25 +157,55 @@ function boot(){
     $('#ia').textContent = (nameOf(n)[0] || '?').toUpperCase();
     $('#it').textContent = (c.metadata && c.metadata.video === false) ? 'FaceTime Audio…' : 'FaceTime Video…';
     $('#inc').classList.add('show');
-    ring(true);
+    ring(true, nameOf(n));
     c.on('close', () => { if (incoming === c){ incoming = null; $('#inc').classList.remove('show'); ring(false); toast('Missed call from ' + nameOf(n)); } });
   });
 }
 
-function ring(on){
-  clearInterval(ringTimer);
-  if (!on) return;
-  const beep = () => {
+let notif = null, titleT = null;
+const TITLE0 = document.title;
+function ring(on, who){
+  clearInterval(ringTimer); clearInterval(titleT);
+  document.title = TITLE0;
+  if (notif){ try { notif.close(); } catch(e){} notif = null; }
+  if (!on){ try { navigator.vibrate(0); } catch(e){} return; }
+
+  // Phone-style double ring (440 + 480 Hz), repeating every 3 seconds
+  const cycle = () => {
     try {
       ringT = ringT || new (window.AudioContext || window.webkitAudioContext)();
-      const o = ringT.createOscillator(), g = ringT.createGain();
-      o.frequency.value = 880; g.gain.value = .08;
-      o.connect(g); g.connect(ringT.destination);
-      o.start(); o.stop(ringT.currentTime + .4);
+      if (ringT.state === 'suspended') ringT.resume();
+      [0, .6].forEach(off => {
+        const t = ringT.currentTime + off, g = ringT.createGain();
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(.2, t + .03);
+        g.gain.setValueAtTime(.2, t + .4);
+        g.gain.linearRampToValueAtTime(0, t + .45);
+        g.connect(ringT.destination);
+        [440, 480].forEach(f => { const o = ringT.createOscillator(); o.frequency.value = f; o.connect(g); o.start(t); o.stop(t + .5); });
+      });
     } catch(e){}
+    try { navigator.vibrate([400, 200, 400]); } catch(e){}
   };
-  beep(); ringTimer = setInterval(beep, 1800);
+  cycle(); ringTimer = setInterval(cycle, 3000);
+
+  let flip = false;
+  titleT = setInterval(() => { document.title = (flip = !flip) ? '📞 Incoming call' : TITLE0; }, 900);
+
+  if ('Notification' in window && Notification.permission === 'granted'){
+    try {
+      notif = new Notification('Incoming FaceTime call', { body: (who || 'Someone') + ' is calling you', tag: 'ft-call', requireInteraction: true });
+      notif.onclick = () => { window.focus(); try { notif.close(); } catch(e){} };
+    } catch(e){}
+  }
 }
+
+// Browsers only allow sound and notifications after one tap or click
+function unlock(){
+  try { ringT = ringT || new (window.AudioContext || window.webkitAudioContext)(); if (ringT.state === 'suspended') ringT.resume(); } catch(e){}
+  try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch(e){}
+}
+document.addEventListener('pointerdown', unlock, { once: true });
 
 async function media(video){
   try {
