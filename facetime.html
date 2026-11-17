@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FaceTime</title>
+<style>
+:root{--bg:#000;--card:#1c1c1e;--line:#38383a;--txt:#fff;--sub:#8e8e93;--green:#30d158;--red:#ff453a;--blue:#0a84ff}
+@media (prefers-color-scheme: light){:root{--bg:#f2f2f7;--card:#fff;--line:#d1d1d6;--txt:#000;--sub:#6c6c70}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--txt);font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+main{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:34px;margin:8px 0 4px}
+.me{background:var(--card);border-radius:14px;padding:14px 16px;margin:12px 0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.me b{font-size:22px;letter-spacing:1px}
+.me small{color:var(--sub);display:block}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--sub);display:inline-block;margin-right:6px}
+.dot.on{background:var(--green)}
+.sp{flex:1}
+input{background:var(--card);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px;width:100%}
+button{font:inherit;border:0;border-radius:999px;padding:10px 16px;background:var(--card);color:var(--blue);cursor:pointer}
+button.pri{background:var(--green);color:#000;font-weight:600}
+.row{display:flex;gap:8px;margin:8px 0}
+h2{font-size:13px;text-transform:uppercase;color:var(--sub);margin:24px 0 8px;letter-spacing:.5px}
+.list{background:var(--card);border-radius:14px;overflow:hidden}
+.c{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.c:last-child{border:0}
+.av{width:40px;height:40px;border-radius:50%;background:#636366;color:#fff;display:grid;place-items:center;font-weight:600}
+.c div.n{flex:1;min-width:0}
+.c small{color:var(--sub);display:block}
+.ic{width:40px;height:40px;padding:0;display:grid;place-items:center;font-size:18px;background:var(--green);color:#000}
+.ic.x{background:transparent;color:var(--sub);font-size:14px}
+.empty{padding:16px;color:var(--sub)}
+#call,#inc{position:fixed;inset:0;background:#000;color:#fff;display:none;z-index:10}
+#call.show,#inc.show{display:block}
+#remote{width:100%;height:100%;object-fit:cover;background:#111}
+#local{position:absolute;right:16px;top:calc(16px + env(safe-area-inset-top));width:110px;aspect-ratio:3/4;object-fit:cover;border-radius:12px;background:#222;transform:scaleX(-1);border:1px solid #fff3}
+#cs{position:absolute;top:calc(20px + env(safe-area-inset-top));left:16px;text-shadow:0 1px 4px #000}
+#cs b{font-size:22px;display:block}
+.bar{position:absolute;bottom:calc(30px + env(safe-area-inset-bottom));left:0;right:0;display:flex;justify-content:center;gap:18px}
+.bar button{width:62px;height:62px;padding:0;font-size:24px;background:#fff3;color:#fff;backdrop-filter:blur(10px)}
+.bar button.off{background:#fff;color:#000}
+.bar button.end{background:var(--red);color:#fff}
+#inc{background:#111e;display:none;place-items:center;text-align:center;backdrop-filter:blur(20px)}
+#inc.show{display:grid}
+#inc .av{width:90px;height:90px;font-size:36px;margin:0 auto 16px}
+#inc h3{font-size:28px;margin:0 0 4px}
+#inc .bar{position:static;margin-top:60px;gap:60px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:999px;display:none;z-index:20;max-width:90%}
+</style>
+</head>
+<body>
+<main>
+  <h1>FaceTime</h1>
+  <div class="me">
+    <div><small><span class="dot" id="dot"></span><span id="st">Connecting…</span> · Your number</small><b id="num">——</b></div>
+    <div class="sp"></div>
+    <button id="copy">Copy link</button>
+  </div>
+
+  <h2>New call</h2>
+  <div class="row">
+    <input id="dial" inputmode="numeric" placeholder="Enter a number">
+    <button class="ic" id="dv" title="Video">📹</button>
+    <button class="ic" id="da" title="Audio">📞</button>
+  </div>
+
+  <h2>Add contact</h2>
+  <div class="row">
+    <input id="cn" placeholder="Name">
+    <input id="cm" inputmode="numeric" placeholder="Number">
+    <button id="add">Add</button>
+  </div>
+
+  <h2>Contacts</h2>
+  <div class="list" id="list"></div>
+</main>
+
+<div id="inc">
+  <div>
+    <div class="av" id="ia">?</div>
+    <h3 id="in">Unknown</h3>
+    <div style="color:#aaa" id="it">FaceTime Video…</div>
+    <div class="bar">
+      <button class="end" id="dec" title="Decline">✕</button>
+      <button style="background:var(--green);color:#000" id="acc" title="Accept">✓</button>
+    </div>
+  </div>
+</div>
+
+<div id="call">
+  <video id="remote" autoplay playsinline></video>
+  <video id="local" autoplay playsinline muted></video>
+  <div id="cs"><b id="cname"></b><span id="cstat"></span></div>
+  <div class="bar">
+    <button id="mic" title="Mute">🎤</button>
+    <button id="cam" title="Camera">📷</button>
+    <button class="end" id="end" title="End">✕</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d){ try { const v = JSON.parse(localStorage.getItem(k)); return v ?? d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+};
+const PFX = 'fct-';
+const clean = s => (s || '').replace(/\D/g, '');
+const fmt = n => n.length === 8 ? n.slice(0,4) + ' ' + n.slice(4) : n;
+const rnd = () => String(Math.floor(1e7 + Math.random() * 9e7));
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+let me = store.get('ft_num', null);
+let contacts = store.get('ft_contacts', []);
+let peer, cur = null, stream = null, incoming = null, ringT = null, ringTimer = null;
+
+function toast(m){ const t = $('#toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 3500); }
+const nameOf = n => (contacts.find(c => c.num === n) || {}).name || fmt(n);
+
+function render(){
+  $('#num').textContent = me ? fmt(me) : '——';
+  const l = $('#list');
+  if (!contacts.length){ l.innerHTML = '<div class="empty">No contacts yet. Add one above.</div>'; return; }
+  l.innerHTML = contacts.map((c, i) =>
+    `<div class="c"><div class="av">${esc(c.name[0] || '?').toUpperCase()}</div>
+     <div class="n"><b>${esc(c.name)}</b><small>${fmt(c.num)}</small></div>
+     <button class="ic" data-v="${i}" title="Video">📹</button>
+     <button class="ic" data-a="${i}" title="Audio">📞</button>
+     <button class="ic x" data-d="${i}" title="Delete">🗑</button></div>`).join('');
+}
+
+function boot(){
+  if (!me){ me = rnd(); store.set('ft_num', me); }
+  render();
+  peer = new Peer(PFX + me);
+  peer.on('open', () => { $('#dot').classList.add('on'); $('#st').textContent = 'Online'; });
+  peer.on('disconnected', () => { $('#dot').classList.remove('on'); $('#st').textContent = 'Reconnecting…'; try { peer.reconnect(); } catch(e){} });
+  peer.on('error', e => {
+    if (e.type === 'unavailable-id'){ me = rnd(); store.set('ft_num', me); peer.destroy(); boot(); return; }
+    if (e.type === 'peer-unavailable'){ endCall('That number isn’t online right now.'); return; }
+    if (e.type === 'network' || e.type === 'server-error' || e.type === 'socket-error'){ $('#st').textContent = 'Offline'; return; }
+    toast('Error: ' + e.type);
+  });
+  peer.on('call', c => {
+    if (cur || incoming){ c.close(); return; }
+    incoming = c;
+    const n = c.peer.replace(PFX, '');
+    $('#in').textContent = nameOf(n);
+    $('#ia').textContent = (nameOf(n)[0] || '?').toUpperCase();
+    $('#it').textContent = (c.metadata && c.metadata.video === false) ? 'FaceTime Audio…' : 'FaceTime Video…';
+    $('#inc').classList.add('show');
+    ring(true);
+    c.on('close', () => { if (incoming === c){ incoming = null; $('#inc').classList.remove('show'); ring(false); toast('Missed call from ' + nameOf(n)); } });
+  });
+}
+
+function ring(on){
+  clearInterval(ringTimer);
+  if (!on) return;
+  const beep = () => {
+    try {
+      ringT = ringT || new (window.AudioContext || window.webkitAudioContext)();
+      const o = ringT.createOscillator(), g = ringT.createGain();
+      o.frequency.value = 880; g.gain.value = .08;
+      o.connect(g); g.connect(ringT.destination);
+      o.start(); o.stop(ringT.currentTime + .4);
+    } catch(e){}
+  };
+  beep(); ringTimer = setInterval(beep, 1800);
+}
+
+async function media(video){
+  try {
+    return await navigator.mediaDevices.getUserMedia({ audio: true, video: video ? { facingMode: 'user' } : false });
+  } catch(e){
+    if (video){
+      try { const s = await navigator.mediaDevices.getUserMedia({ audio: true }); toast('Camera unavailable, using audio only.'); return s; } catch(e2){}
+    }
+    toast('Allow microphone/camera access to make calls.');
+    return null;
+  }
+}
+
+function showCall(name, status){
+  $('#cname').textContent = name; $('#cstat').textContent = status;
+  $('#local').srcObject = stream;
+  $('#mic').classList.remove('off'); $('#cam').classList.remove('off');
+  $('#call').classList.add('show');
+}
+
+function wire(c){
+  cur = c;
+  let connected = false;
+  c.on('stream', r => { connected = true; $('#remote').srcObject = r; $('#cstat').textContent = 'Connected'; clearTimeout(cur._to); });
+  c.on('close', () => { if (cur === c) endCall(connected ? 'Call ended.' : 'No answer.'); });
+  c.on('error', () => { if (cur === c) endCall('Call failed.'); });
+}
+
+async function dial(raw, video){
+  const n = clean(raw);
+  if (!n) return toast('Enter a number.');
+  if (n === me) return toast('That’s your own number.');
+  if (cur || incoming) return;
+  if (!peer || !peer.open) return toast('Still connecting. Try again in a moment.');
+  stream = await media(video); if (!stream) return;
+  const c = peer.call(PFX + n, stream, { metadata: { video } });
+  if (!c){ stream.getTracks().forEach(t => t.stop()); return toast('Couldn’t start the call.'); }
+  wire(c); showCall(nameOf(n), 'Calling…');
+  c._to = setTimeout(() => { if (cur === c) endCall('No answer.'); }, 45000);
+}
+
+async function accept(){
+  const c = incoming; if (!c) return;
+  incoming = null; ring(false); $('#inc').classList.remove('show');
+  stream = await media(!(c.metadata && c.metadata.video === false));
+  if (!stream){ c.close(); return; }
+  c.answer(stream); wire(c);
+  showCall(nameOf(c.peer.replace(PFX, '')), 'Connecting…');
+}
+
+function decline(){
+  const c = incoming; incoming = null; ring(false);
+  $('#inc').classList.remove('show');
+  if (c) c.close();
+}
+
+function endCall(msg){
+  const c = cur; cur = null;
+  if (c){ clearTimeout(c._to); try { c.close(); } catch(e){} }
+  if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
+  $('#remote').srcObject = null; $('#local').srcObject = null;
+  $('#call').classList.remove('show');
+  if (msg) toast(msg);
+}
+
+$('#dv').onclick = () => dial($('#dial').value, true);
+$('#da').onclick = () => dial($('#dial').value, false);
+$('#dial').addEventListener('keydown', e => { if (e.key === 'Enter') dial($('#dial').value, true); });
+$('#add').onclick = () => {
+  const name = $('#cn').value.trim(), num = clean($('#cm').value);
+  if (!name || !num) return toast('Enter a name and a number.');
+  contacts = contacts.filter(c => c.num !== num);
+  contacts.push({ name, num });
+  contacts.sort((a, b) => a.name.localeCompare(b.name));
+  store.set('ft_contacts', contacts);
+  $('#cn').value = ''; $('#cm').value = '';
+  render();
+};
+$('#list').onclick = e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.v != null) dial(contacts[b.dataset.v].num, true);
+  else if (b.dataset.a != null) dial(contacts[b.dataset.a].num, false);
+  else if (b.dataset.d != null){ contacts.splice(+b.dataset.d, 1); store.set('ft_contacts', contacts); render(); }
+};
+$('#copy').onclick = async () => {
+  const link = location.href.split('#')[0] + '#call=' + me;
+  try { await navigator.clipboard.writeText(link); toast('Link copied. Anyone who opens it can call you.'); }
+  catch(e){ prompt('Copy this link:', link); }
+};
+$('#acc').onclick = accept;
+$('#dec').onclick = decline;
+$('#end').onclick = () => endCall('Call ended.');
+$('#mic').onclick = e => { if (!stream) return; const t = stream.getAudioTracks()[0]; if (t){ t.enabled = !t.enabled; e.currentTarget.classList.toggle('off', !t.enabled); } };
+$('#cam').onclick = e => { if (!stream) return; const t = stream.getVideoTracks()[0]; if (t){ t.enabled = !t.enabled; e.currentTarget.classList.toggle('off', !t.enabled); } };
+
+const m = location.hash.match(/call=(\d+)/);
+if (m){ $('#dial').value = m[1]; }
+boot();
+</script>
+</body>
+</html>
