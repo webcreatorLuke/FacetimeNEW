@@ -92,6 +92,7 @@ h2{font-size:13px;text-transform:uppercase;color:var(--sub);margin:24px 0 8px;le
 <div id="call">
   <video id="remote" autoplay playsinline></video>
   <video id="local" autoplay playsinline muted></video>
+  <button id="tap" style="display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#fff;color:#000;font-weight:600;padding:14px 22px">Tap to start video &amp; sound</button>
   <div id="cs"><b id="cname"></b><span id="cstat"></span></div>
   <div class="bar">
     <button id="mic" title="Mute">🎤</button>
@@ -195,7 +196,24 @@ function showCall(name, status){
 function wire(c){
   cur = c;
   let connected = false;
-  c.on('stream', r => { connected = true; $('#remote').srcObject = r; $('#cstat').textContent = 'Connected'; clearTimeout(cur._to); });
+  c.on('stream', s => {
+    connected = true; clearTimeout(c._to);
+    const v = $('#remote');
+    v.srcObject = s; v.muted = false; v.volume = 1;
+    $('#cstat').textContent = 'Connected';
+    const p = v.play(); if (p && p.catch) p.catch(() => { $('#tap').style.display = 'block'; });
+  });
+  const watch = () => {
+    if (cur !== c) return;
+    const pc = c.peerConnection; if (!pc) return setTimeout(watch, 300);
+    pc.oniceconnectionstatechange = () => {
+      const s = pc.iceConnectionState;
+      if (s === 'failed') endCall('Couldn’t connect. One network may be blocking direct calls. Try different wifi or mobile data.');
+      else if (s === 'disconnected') $('#cstat').textContent = 'Reconnecting…';
+      else if (s === 'connected' || s === 'completed') $('#cstat').textContent = 'Connected';
+    };
+  };
+  watch();
   c.on('close', () => { if (cur === c) endCall(connected ? 'Call ended.' : 'No answer.'); });
   c.on('error', () => { if (cur === c) endCall('Call failed.'); });
 }
@@ -234,6 +252,7 @@ function endCall(msg){
   if (stream){ stream.getTracks().forEach(t => t.stop()); stream = null; }
   $('#remote').srcObject = null; $('#local').srcObject = null;
   $('#call').classList.remove('show');
+  $('#tap').style.display = 'none';
   if (msg) toast(msg);
 }
 
@@ -261,6 +280,7 @@ $('#copy').onclick = async () => {
   try { await navigator.clipboard.writeText(link); toast('Link copied. Anyone who opens it can call you.'); }
   catch(e){ prompt('Copy this link:', link); }
 };
+$('#tap').onclick = () => { $('#remote').play().catch(() => {}); $('#local').play().catch(() => {}); $('#tap').style.display = 'none'; };
 $('#acc').onclick = accept;
 $('#dec').onclick = decline;
 $('#end').onclick = () => endCall('Call ended.');
